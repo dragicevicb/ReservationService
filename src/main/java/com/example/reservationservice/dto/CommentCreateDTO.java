@@ -13,17 +13,13 @@ import javax.validation.constraints.NotNull;
 
 @Getter
 @Setter
-public class CommentCreateDTO {
-    @NotNull
-    private Long guestId;
+public class CommentCreateDTO extends DTO{
     @NotNull
     @Min(1)
     @Max(5)
     private int rating;
+    @NotNull
     private String desc;
     @NotNull
     Hotel hotel;
-    /*
-
-     */
 }

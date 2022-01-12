@@ -5,7 +5,8 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class ReservationDTO extends DTO{
-    private boolean status;
+public class CommentDTO extends DTO{
     private Long id;
+    private int rating;
+    private String desc;
 }

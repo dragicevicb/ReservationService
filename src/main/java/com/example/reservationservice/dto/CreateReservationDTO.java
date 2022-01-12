@@ -9,9 +9,7 @@ import java.util.Date;
 
 @Getter
 @Setter
-public class CreateReservationDTO {
-    @NotNull
-    private Long id;
+public class CreateReservationDTO extends DTO{
     @NotNull
     private Long roomId;
     @NotBlank

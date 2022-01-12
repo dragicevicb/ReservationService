@@ -1,20 +1,17 @@
 package com.example.reservationservice.service.impl;
 
-import com.example.reservationservice.domain.Hotel;
-import com.example.reservationservice.domain.Reservation;
-import com.example.reservationservice.domain.Room;
-import com.example.reservationservice.domain.Term;
+import com.example.reservationservice.domain.*;
 import com.example.reservationservice.dto.*;
+import com.example.reservationservice.mapper.CommentMapper;
 import com.example.reservationservice.mapper.ReservationMapper;
 import com.example.reservationservice.mapper.TermMapper;
+import com.example.reservationservice.repository.CommentRepository;
 import com.example.reservationservice.repository.HotelRepository;
 import com.example.reservationservice.repository.ReservationRepository;
 import com.example.reservationservice.service.ReservationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Service;
@@ -31,11 +28,13 @@ import java.util.Optional;
 public class ReservationServiceImpl implements ReservationService {
 
     private HotelRepository hotelRepository;
+    private CommentRepository commentRepository;
     private ReservationRepository reservationRepository;
     private TermMapper termMapper;
     private ReservationMapper reservationMapper;
     private JmsTemplate jmsTemplate;
-    ObjectMapper objectMapper;
+    private ObjectMapper objectMapper;
+    private CommentMapper commentMapper;
     @Value("${destination.createReservation}")
     private String destinationCreateReservation;
     @Value("${destination.deleteReservation}")
@@ -114,5 +113,31 @@ public class ReservationServiceImpl implements ReservationService {
            return reservationMapper.reservationToReservationDeleteDTO(true);
        }
         return reservationMapper.reservationToReservationDeleteDTO(false);
+    }
+
+    @Override
+    public CommentDTO createComment(CommentCreateDTO dto) {
+        Comment comment = commentMapper.commentCreateDTOToComment(dto);
+        commentRepository.save(comment);
+
+        return commentMapper.commentToCommentDTO(comment);
+    }
+
+    @Override
+    public CommentDTO updateComment(CommentCreateDTO dto) {
+        Comment comment = commentMapper.commentCreateDTOToComment(dto);
+        commentRepository.save(comment);
+
+        return commentMapper.commentToCommentDTO(comment);
+    }
+
+    @Override
+    public CommentDeleteDTO deleteComment(CommentDTO dto) {
+        if(commentRepository.findCommentById(dto.getId()).isPresent()){
+            commentRepository.deleteById(dto.getId());
+            return commentMapper.commentToCommentDeleteDTO(true);
+        }
+
+        return commentMapper.commentToCommentDeleteDTO(false);
     }
 }

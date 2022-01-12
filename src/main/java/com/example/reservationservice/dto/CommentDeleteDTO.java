@@ -5,7 +5,6 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class ReservationDTO extends DTO{
+public class CommentDeleteDTO {
     private boolean status;
-    private Long id;
 }
