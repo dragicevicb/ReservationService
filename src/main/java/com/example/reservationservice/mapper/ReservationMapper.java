@@ -1,5 +1,6 @@
 package com.example.reservationservice.mapper;
 
+import com.example.reservationservice.domain.Hotel;
 import com.example.reservationservice.domain.Reservation;
 import com.example.reservationservice.domain.Room;
 import com.example.reservationservice.domain.Term;
@@ -7,6 +8,7 @@ import com.example.reservationservice.dto.CreateReservationDTO;
 import com.example.reservationservice.dto.ReservationDTO;
 import com.example.reservationservice.dto.ReservationDeleteDTO;
 import com.example.reservationservice.dto.ReservationListingDTO;
+import com.example.reservationservice.repository.HotelRepository;
 import com.example.reservationservice.repository.ReservationRepository;
 import com.example.reservationservice.repository.RoomRepository;
 import com.example.reservationservice.repository.TermRepository;
@@ -24,11 +26,23 @@ public class ReservationMapper {
     TermRepository termRepository;
     RoomRepository roomRepository;
     ReservationRepository reservationRepository;
+    HotelRepository hotelRepository;
 
-    public ReservationListingDTO generateListing(Long id){
+    public ReservationMapper(TermRepository termRepository, RoomRepository roomRepository, ReservationRepository reservationRepository, HotelRepository hotelRepository) {
+        this.termRepository = termRepository;
+        this.roomRepository = roomRepository;
+        this.reservationRepository = reservationRepository;
+        this.hotelRepository = hotelRepository;
+    }
+
+    public ReservationListingDTO generateListing(Long id, String type){
         ReservationListingDTO dto = new ReservationListingDTO();
-        dto.setReservationList(reservationRepository.findReservationsById(id));
-
+        if(type.equals("C")) {
+            dto.setReservationList(reservationRepository.findReservationsByGuestId(id));
+        }else if(type.equals("M")){
+            Hotel hotel = hotelRepository.findHotelByManagerId(id).get();
+            dto.setReservationList(hotel.getReservations());
+        }
         return dto;
     }
 

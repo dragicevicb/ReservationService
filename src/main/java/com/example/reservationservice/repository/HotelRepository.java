@@ -11,4 +11,5 @@ public interface HotelRepository extends JpaRepository<Hotel, Long> {
     Optional<Hotel> findHotelByNameAndCity(String name,String city);
     List<Hotel> findHotelsByName(String name);
     List<Hotel> findHotelsByCity(String city);
+    Optional<Hotel> findHotelByManagerId(Long id);
 }

@@ -17,6 +17,7 @@ public class Reservation {
     private String firstName;
     private String lastName;
     private String email;
+    private double price;
     @OneToMany
     List<Term> terms;
 }

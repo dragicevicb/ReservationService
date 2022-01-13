@@ -2,31 +2,33 @@ package com.example.reservationservice.service.impl;
 
 import com.example.reservationservice.domain.*;
 import com.example.reservationservice.dto.*;
-import com.example.reservationservice.mapper.CommentMapper;
-import com.example.reservationservice.mapper.ReservationMapper;
-import com.example.reservationservice.mapper.TermMapper;
-import com.example.reservationservice.repository.CommentRepository;
-import com.example.reservationservice.repository.HotelRepository;
-import com.example.reservationservice.repository.ReservationRepository;
+import com.example.reservationservice.mapper.*;
+import com.example.reservationservice.repository.*;
+import com.example.reservationservice.service.HttpService;
 import com.example.reservationservice.service.ReservationService;
+import com.example.reservationservice.service.TokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @Getter
 @Setter
 public class ReservationServiceImpl implements ReservationService {
 
+    private TokenService tokenService;
+    private HotelMapper hotelMapper;
+    private HttpService httpService;
+    private RoomTypeRepository roomTypeRepository;
+    private RoomRepository roomRepository;
+    private PriceMapper priceMapper;
     private HotelRepository hotelRepository;
     private CommentRepository commentRepository;
     private ReservationRepository reservationRepository;
@@ -39,6 +41,27 @@ public class ReservationServiceImpl implements ReservationService {
     private String destinationCreateReservation;
     @Value("${destination.deleteReservation}")
     private String destinationDeleteReservation;
+    @Value("${destination.sendNotification}")
+    private String destinationSendNotification;
+
+    public ReservationServiceImpl(HotelMapper hotelMapper, HttpService httpService, RoomTypeRepository roomTypeRepository,
+                                  RoomRepository roomRepository, PriceMapper priceMapper, HotelRepository hotelRepository,
+                                  CommentRepository commentRepository, ReservationRepository reservationRepository, TermMapper termMapper,
+                                  ReservationMapper reservationMapper, JmsTemplate jmsTemplate, ObjectMapper objectMapper, CommentMapper commentMapper) {
+        this.hotelMapper = hotelMapper;
+        this.httpService = httpService;
+        this.roomTypeRepository = roomTypeRepository;
+        this.roomRepository = roomRepository;
+        this.priceMapper = priceMapper;
+        this.hotelRepository = hotelRepository;
+        this.commentRepository = commentRepository;
+        this.reservationRepository = reservationRepository;
+        this.termMapper = termMapper;
+        this.reservationMapper = reservationMapper;
+        this.jmsTemplate = jmsTemplate;
+        this.objectMapper = objectMapper;
+        this.commentMapper = commentMapper;
+    }
 
     //jako ruzan kod, valjalo bi popraviti
     @Override
@@ -78,19 +101,54 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
-    public ReservationListingDTO reservationListing(Long id) {
-        return reservationMapper.generateListing(id);
+    public ReservationListingDTO reservationListing(Long id, String authorization) {
+        Claims claims = tokenService.parseToken(authorization.split(" ")[1]);
+        String type = claims.get("type", String.class);
+        return reservationMapper.generateListing(id, type);
     }
 
     @Override
     public ReservationDTO makeReservation(CreateReservationDTO dto) {
         Reservation reservation = reservationMapper.createReservationDTOToReservation(dto);
+        int discount = 0;
+
+        long diff = dto.getEndDate().getTime() - dto.getStartDate().getTime();
+        long difference_In_Days
+                = (diff
+                / (1000 * 60 * 60 * 24))
+                % 365;
+        PriceRequestDTO requestDTO = priceMapper.generateRequest(reservation.getGuestId());
+
         try {
-            jmsTemplate.convertAndSend(destinationCreateReservation, objectMapper.writeValueAsString(reservation.getGuestId()));
-            //TODO notification service
+            discount = httpService.getDiscount(requestDTO);
         }catch (Exception ex){
             ex.printStackTrace();
         }
+
+        double price = roomTypeRepository.findRoomTypeByRoom(roomRepository.getById(dto.getRoomId()))
+                .get().getPricePerDay()*difference_In_Days*((100.0-discount)/100.0);
+
+        reservation.setPrice(price);
+        try {
+            jmsTemplate.convertAndSend(destinationCreateReservation, objectMapper.writeValueAsString(reservation.getGuestId()));
+            Map<String,String> map = new HashMap<>();
+            map.put("firstName", reservation.getFirstName());
+            map.put("lastName",reservation.getLastName());
+            map.put("price", String.valueOf(reservation.getPrice()));
+            map.put("roomNo", String.valueOf(roomRepository.getById(dto.getRoomId()).getRoomNo()));
+            List<String> recipients = new ArrayList<>();
+            recipients.add(reservation.getEmail());
+            recipients.add(roomRepository.getById(dto.getRoomId()).getHotel().getManagerEmail());
+            CreateNotificationDTO notification = new CreateNotificationDTO(reservation.getGuestId(), recipients,
+                                                map, "makeReservation");
+            jmsTemplate.convertAndSend(destinationDeleteReservation, objectMapper.writeValueAsString(notification));
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
+
+        Hotel hotel = roomRepository.getById(dto.getRoomId()).getHotel();
+        hotel.getReservations().add(reservation);
+        hotelRepository.save(hotel);
         reservationRepository.save(reservation);
         return reservationMapper.reservationToReservationDTO(reservation);
     }
@@ -105,10 +163,20 @@ public class ReservationServiceImpl implements ReservationService {
            }
            try {
                jmsTemplate.convertAndSend(destinationDeleteReservation, objectMapper.writeValueAsString(reservation.getGuestId()));
-               //TODO notification service
+               Map<String,String> map = new HashMap<>();
+               map.put("firstName", reservation.getFirstName());
+               map.put("lastName",reservation.getLastName());
+               map.put("roomNo",String.valueOf(reservation.getTerms().get(1).getRoom().getRoomNo()));
+               List<String> recipients = new ArrayList<>();
+               recipients.add(reservation.getEmail());
+               recipients.add(roomRepository.getById(reservation.getTerms().get(1).getRoom().getId()).getHotel().getManagerEmail());
+               CreateNotificationDTO notification = new CreateNotificationDTO(reservation.getGuestId(), recipients,
+                                                        map, "deleteReservation");
+               jmsTemplate.convertAndSend(destinationDeleteReservation, objectMapper.writeValueAsString(notification));
            }catch (Exception ex){
                ex.printStackTrace();
            }
+
            reservationRepository.delete(reservation);
            return reservationMapper.reservationToReservationDeleteDTO(true);
        }
@@ -139,5 +207,21 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         return commentMapper.commentToCommentDeleteDTO(false);
+    }
+
+    @Override
+    public HotelDTO createHotel(CreateHotelDTO dto) {
+        Hotel hotel = hotelMapper.createHotelDTOTOHotel(dto);
+        hotelRepository.save(hotel);
+
+        return hotelMapper.hotelToHotelDTO(hotel);
+    }
+
+    @Override
+    public HotelDTO updateHotel(CreateHotelDTO dto) {
+        Hotel hotel = hotelMapper.createHotelDTOTOHotel(dto);
+        hotelRepository.save(hotel);
+
+        return hotelMapper.hotelToHotelDTO(hotel);
     }
 }

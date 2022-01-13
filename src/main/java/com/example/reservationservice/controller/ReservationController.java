@@ -19,8 +19,9 @@ public class ReservationController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ReservationListingDTO> reservationListing(@RequestParam(name = "id") Long id){
-        return new ResponseEntity<>(reservationService.reservationListing(id), HttpStatus.OK);
+    public ResponseEntity<ReservationListingDTO> reservationListing(@PathVariable("id") Long id,
+                                                                    @RequestHeader("Authorization") String authorization){
+        return new ResponseEntity<>(reservationService.reservationListing(id, authorization), HttpStatus.OK);
     }
 
     @GetMapping("/listing")
@@ -32,7 +33,7 @@ public class ReservationController {
     @CheckSecurity(roles = {"C","M"})
     public ResponseEntity<ReservationDTO> makeReservation(@RequestBody @Valid CreateReservationDTO dto,
                                                           @RequestHeader("Authorization") String authorization){
-        return new ResponseEntity<>(reservationService.makeReservation(dto), HttpStatus.OK);
+        return new ResponseEntity<>(reservationService.makeReservation(dto), HttpStatus.CREATED);
     }
 
     @DeleteMapping("/deleteReservation")
@@ -46,7 +47,7 @@ public class ReservationController {
     @CheckSecurity(roles = {"C","M"})
     public ResponseEntity<CommentDTO> createComment(@RequestBody CommentCreateDTO dto,
                                                     @RequestHeader("Authorization") String authorization){
-        return new ResponseEntity<>(reservationService.createComment(dto), HttpStatus.OK);
+        return new ResponseEntity<>(reservationService.createComment(dto), HttpStatus.CREATED);
     }
 
     @PutMapping("/updateComment")
@@ -61,5 +62,19 @@ public class ReservationController {
     public ResponseEntity<CommentDeleteDTO> deleteComment(@RequestBody CommentDTO dto,
                                                           @RequestHeader("Authorization") String authorization){
         return new ResponseEntity<>(reservationService.deleteComment(dto), HttpStatus.OK);
+    }
+
+    @PostMapping("/createHotel")
+    @CheckSecurity(roles = {"A","M"})
+    public ResponseEntity<HotelDTO> createHotel(@RequestBody CreateHotelDTO dto,
+                                                @RequestHeader("Authorization") String authorization){
+        return new ResponseEntity<>(reservationService.createHotel(dto),HttpStatus.CREATED);
+    }
+
+    @PutMapping("/updateHotel")
+    @CheckSecurity(roles = {"A","M"})
+    public ResponseEntity<HotelDTO> updateHotel(@RequestBody CreateHotelDTO dto,
+                                                @RequestHeader("Authorization") String authorization){
+        return new ResponseEntity<>(reservationService.createHotel(dto),HttpStatus.OK);
     }
 }
